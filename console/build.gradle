@@ -1,0 +1,29 @@
+apply plugin: 'java'
+
+android {
+	
+	buildTypes {
+		// 仅支持release配置，仅当值为true时启用
+		release {
+			// 代码混淆[增量构建失效]
+			minifyEnabled false
+			// 代码混淆配置文件
+			proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+		}
+	}
+}
+
+dependencies {
+	compile fileTree(dir: 'libs', include: ['*.jar'])
+	// runtime目录
+	// 用于放置打包jar根目录classes{N}.dex文件
+	// 也支持资源文件
+	runtimeOnly fileTree(dir: 'runtime', include: ['*.jar'])
+	// 仅编译
+	compileOnly fileTree(dir: 'provider', include: ['.jar'])
+	
+	// 可以正常使用 api compileOnly等
+	
+	// kotlin库如果类冲突，取消下一行注释
+	// api "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.0.0"
+}
