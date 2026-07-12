@@ -1,0 +1,8 @@
+{
+"package":"quark",
+"title":"quark直链",
+"hook":true,
+"version":3,
+"minSdk":119,
+"author":"dorobonneko"
+}
