@@ -1,0 +1,10 @@
+{
+"package":"quark",
+"title":"quark直链",
+"version":4,
+"minSdk":124,
+"author":"dorobonneko",
+"apply":"plugin",
+"plugins":[{"hook":true,"setup":"moe.Hook","path":"/classes.dex.zip","name":"quark_hook"}],
+"icon":"favicon.ico"
+}
