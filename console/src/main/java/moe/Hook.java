@@ -36,7 +36,7 @@ public class Hook implements IHook {
 		handler.post(()->{
 		pd=new ProgressDialog(ctx);
 		pd.setCanceledOnTouchOutside(false);
-		pd.setTitle("夸克网盘");
+		pd.setTitle("夸克/UC网盘");
 		pd.setMessage("正在解析直链");
 		});
 	}
@@ -66,19 +66,68 @@ public class Hook implements IHook {
 	public boolean canHook(WebResourceRequest webResourceRequest)
 	{
 		// TODO: Implement this method
-		return webResourceRequest.getUrl().toString().startsWith("https://pan.quark.cn/1/clouddrive/task");
+		return webResourceRequest.getUrl().toString().startsWith("https://pan.quark.cn/1/clouddrive/task")||webResourceRequest.getUrl().toString().startsWith("https://pc-api.uc.cn/1/clouddrive/task");
 	}
 
 	@Override
 	public String[] getWhiteList()
 	{
 		// TODO: Implement this method
-		return new String[]{"pan.quark.cn"};
+		return new String[]{"pan.quark.cn","drive.uc.cn"};
 	}
 
 
 
 	public WebResourceResponse hook(WebResourceRequest request) {
+		if(request.getUrl().toString().startsWith("https://pc-api.uc.cn/1/clouddrive/task")){
+			return uc(request);
+		}else{
+			return quark(request);
+		}
+		
+		}
+		
+	public WebResourceResponse uc(WebResourceRequest request){
+		try{
+			HttpURLConnection huc = (HttpURLConnection) new URL(request.getUrl().toString()).openConnection();
+			if (huc instanceof HttpsURLConnection) {
+				HttpsURLConnection hsuc = (HttpsURLConnection) huc;
+				hsuc.setSSLSocketFactory(getSSLSocketFactory());
+			}
+			Iterator<Map.Entry<String, String>> i = request.getRequestHeaders().entrySet().iterator();
+			while (i.hasNext()) {
+				Map.Entry<String, String> entry = i.next();
+				huc.setRequestProperty(entry.getKey(), entry.getValue());
+			}
+			try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+				int len = -1;
+				byte[] buff = new byte[256];
+				InputStream in = huc.getInputStream();
+				while ((len = in.read(buff)) != -1)
+					baos.write(buff, 0, len);
+				baos.flush();
+				try {
+					JSONObject jo = new JSONObject(baos.toString());
+					if (jo.has("data")) {
+						jo = jo.getJSONObject("data");
+						if (jo.has("save_as")) {
+							jo = jo.getJSONObject("save_as");
+							if (jo.has("save_as_top_fids")) {
+								JSONArray fids = jo.getJSONArray("save_as_top_fids");
+								JSONObject fid = new JSONObject();
+								fid.put("fids", fids);
+								new UcQueryLink(fid, request.getRequestHeaders()).start();
+							}
+						}
+					}
+				} catch (JSONException e) {
+				}
+				return new WebResourceResponse(null, null, new ByteArrayInputStream(baos.toByteArray()));
+			}
+		}catch(Exception e){}
+		return null;
+	}
+	public WebResourceResponse quark(WebResourceRequest request){
 		try{
 		HttpURLConnection huc = (HttpURLConnection) new URL(request.getUrl().toString()).openConnection();
 			if (huc instanceof HttpsURLConnection) {
@@ -151,6 +200,96 @@ public class Hook implements IHook {
 					}
 			}
 		return mSSLSocketFactory;
+	}
+	class UcQueryLink extends Thread{
+		private JSONObject data;
+		private Map<String,String> header;
+		UcQueryLink(JSONObject data,Map<String,String> header){
+			this.data=data;
+			this.header=header;
+		}
+
+		@Override
+		public void start()
+		{
+			showDialog();
+			super.start();
+		}
+
+
+		@Override
+		public void run()
+		{
+			try
+			{
+				try
+				{
+					Thread.sleep(3000);
+				}
+				catch (InterruptedException e)
+				{}
+				download(data,header);
+				dismiss(0);
+			}
+			catch (IOException e)
+			{
+				showError("解析失败 "+e.toString());
+				dismiss(3000);
+			}finally{
+
+			}
+		}
+		private void download(JSONObject data, Map<String, String> header) throws IOException {
+			HttpURLConnection huc = (HttpURLConnection) new URL(
+				//"https://drive-pc.quark.cn/1/clouddrive/file/download?pr=ucpro&fr=pc&uc_param_str="
+				"https://pc-api.uc.cn/1/clouddrive/file/download?pr=UCBrowser&fr=pc"
+			).openConnection();
+			if (huc instanceof HttpsURLConnection) {
+				HttpsURLConnection hsuc = (HttpsURLConnection) huc;
+				hsuc.setSSLSocketFactory(getSSLSocketFactory());
+			}
+			Iterator<Map.Entry<String, String>> i = header.entrySet().iterator();
+			while (i.hasNext()) {
+				Map.Entry<String, String> entry = i.next();
+				huc.setRequestProperty(entry.getKey(), entry.getValue());
+			}
+			huc.setRequestMethod("POST");
+			huc.setRequestProperty("Content-Type", "application/json");
+			huc.setRequestProperty("User-Agent",
+								   "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/150.0.7871.63  Safari/537.36");
+			byte[] body = data.toString().getBytes();
+			huc.setRequestProperty("Content-Length", String.valueOf(body.length));
+			OutputStream out = huc.getOutputStream();
+			out.write(body);
+			out.flush();
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			int len = -1;
+			byte[] buff = new byte[256];
+			InputStream in = huc.getInputStream();
+			while ((len = in.read(buff)) != -1)
+				baos.write(buff, 0, len);
+			baos.flush();
+			try {
+				JSONObject jo = new JSONObject(baos.toString());
+				if (jo.has("data")) {
+					jo = jo.getJSONArray("data").getJSONObject(0);
+					if (jo.has("download_url")) {
+						String download_url = jo.getString("download_url");
+						String name = jo.getString("file_name");
+						if (callback != null) {
+							Map<String, String> headers = new HashMap<>();
+							headers.put("User-Agent",
+										"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/150.0.7871.63  Safari/537.36");
+							headers.put("Cookie", header.get("Cookie"));
+							callback.download(download_url, name, headers);
+						}
+					}
+				}
+			} catch (JSONException e) {
+				throw new RuntimeException(e);
+			}
+			baos.close();
+		}
 	}
 	class QueryLink extends Thread{
 		private JSONObject data;
