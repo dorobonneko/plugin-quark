@@ -14,7 +14,7 @@ android {
 }
 
 dependencies {
-	compile fileTree(dir: 'libs', include: ['*.jar'])
+	compileOnly fileTree(dir: 'libs', include: ['*.jar'])
 	// runtime目录
 	// 用于放置打包jar根目录classes{N}.dex文件
 	// 也支持资源文件
