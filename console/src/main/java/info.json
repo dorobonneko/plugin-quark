@@ -1,8 +1,8 @@
 {
 "package":"quark",
 "title":"quark/uc直链",
-"version":5,
-"minSdk":124,
+"version":6,
+"minSdk":125,
 "author":"dorobonneko",
 "apply":"plugin",
 "plugins":[{"hook":true,"setup":"moe.Hook","path":"/classes.dex.zip","name":"quark_hook"}],
